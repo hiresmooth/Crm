@@ -1,0 +1,690 @@
+// SmoothOS Estimator — Prisma Schema
+// See docs/smoothos/02-database-schema.md for full documentation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  manager
+  estimator
+  sales
+  office
+}
+
+enum LeadSource {
+  google_business
+  website_organic
+  google_ads
+  direct_call
+  referral
+  facebook_instagram
+  chatbot
+  repeat_client
+  other
+}
+
+enum LeadStage {
+  new_lead
+  contacted
+  estimate_in_progress
+  proposal_sent
+  follow_up_needed
+  won
+  lost
+}
+
+enum ProjectType {
+  residential
+  multifamily
+  commercial
+  municipal
+}
+
+enum ServiceCode {
+  closed_cell_foam
+  open_cell_foam
+  attic_insulation
+  basement_insulation
+  crawl_space_insulation
+  blow_in_insulation
+  air_sealing
+  drywall
+  plastering
+  window_replacement
+}
+
+enum QuantityType {
+  sq_ft
+  board_ft
+  linear_ft
+  each
+  cubic_ft
+  bag
+}
+
+enum AccessDifficulty {
+  standard
+  moderate
+  difficult
+  extreme
+}
+
+enum JobCondition {
+  occupied
+  new_construction
+  remediation
+  winter
+  hazmat_adjacent
+}
+
+enum EstimateStatus {
+  draft
+  in_review
+  approved
+  revision_requested
+  superseded
+  archived
+}
+
+enum MarginStatus {
+  green
+  yellow
+  red
+  min_job_adjusted
+}
+
+enum ProposalStatus {
+  draft
+  internal_review
+  internal_approved
+  sent
+  viewed
+  client_approved
+  client_declined
+  expired
+  superseded
+}
+
+enum JobStatus {
+  pending_schedule
+  scheduled
+  in_progress
+  substantially_complete
+  closed
+  cancelled
+}
+
+enum EquipmentChargeType {
+  flat
+  per_day
+  per_hour
+  per_job_allocation
+}
+
+enum ActivityEventType {
+  lead_created
+  lead_updated
+  lead_stage_changed
+  estimate_created
+  estimate_updated
+  estimate_submitted
+  estimate_approved
+  estimate_revision_requested
+  margin_override
+  proposal_created
+  proposal_internal_approved
+  proposal_sent
+  proposal_viewed
+  proposal_client_approved
+  proposal_client_declined
+  job_created
+  note_added
+  document_uploaded
+}
+
+enum DrywallFinishLevel {
+  level_1
+  level_2
+  level_3
+  level_4
+  level_5
+}
+
+enum PlasterSystem {
+  veneer
+  traditional_3_coat
+  skim_coat
+  repair_patch
+}
+
+enum WindowSizeTier {
+  small
+  medium
+  large
+  picture
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  firstName    String   @map("first_name") @db.VarChar(100)
+  lastName     String   @map("last_name") @db.VarChar(100)
+  role         UserRole
+  phone        String?  @db.VarChar(20)
+  isActive     Boolean  @default(true) @map("is_active")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  assignedSalesLeads      Lead[]     @relation("SalesLeads")
+  assignedEstimatorLeads  Lead[]     @relation("EstimatorLeads")
+  estimates               Estimate[] @relation("EstimatorEstimates")
+  approvedEstimates       Estimate[] @relation("ApprovedEstimates")
+  sentProposals           Proposal[] @relation("SentProposals")
+  internalApprovedProposals Proposal[] @relation("InternalApprovedProposals")
+  marginOverrides         MarginOverride[]
+  activityLogs            ActivityLog[]
+  alerts                  Alert[]
+  documents               Document[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Client {
+  id              String   @id @default(uuid()) @db.Uuid
+  externalCrmId   String?  @map("external_crm_id") @db.VarChar(100)
+  firstName       String   @map("first_name") @db.VarChar(100)
+  lastName        String   @map("last_name") @db.VarChar(100)
+  companyName     String?  @map("company_name") @db.VarChar(200)
+  email           String?  @db.VarChar(255)
+  phone           String?  @db.VarChar(20)
+  billingStreet   String?  @map("billing_street") @db.VarChar(255)
+  billingCity     String?  @map("billing_city") @db.VarChar(100)
+  billingState    String?  @default("MA") @map("billing_state") @db.Char(2)
+  billingZip      String?  @map("billing_zip") @db.VarChar(10)
+  jobsCount       Int      @default(0) @map("jobs_count")
+  lifetimeRevenue Decimal  @default(0) @map("lifetime_revenue") @db.Decimal(12, 2)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  leads     Lead[]
+  estimates Estimate[]
+  jobs      Job[]
+  activityLogs ActivityLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([externalCrmId])
+  @@map("clients")
+}
+
+model Lead {
+  id                      String      @id @default(uuid()) @db.Uuid
+  clientId                String      @map("client_id") @db.Uuid
+  leadNumber              String      @unique @map("lead_number") @db.VarChar(20)
+  source                  LeadSource
+  stage                   LeadStage   @default(new_lead)
+  serviceType             ServiceCode @map("service_type")
+  projectType             ProjectType @default(residential) @map("project_type")
+  projectStreet           String?     @map("project_street") @db.VarChar(255)
+  projectCity             String      @map("project_city") @db.VarChar(100)
+  projectState            String      @default("MA") @map("project_state") @db.Char(2)
+  projectZip              String?     @map("project_zip") @db.VarChar(10)
+  description             String?
+  assignedSalesUserId     String?     @map("assigned_sales_user_id") @db.Uuid
+  assignedEstimatorUserId String?     @map("assigned_estimator_user_id") @db.Uuid
+  estimatedValue          Decimal?    @map("estimated_value") @db.Decimal(12, 2)
+  lostReason              String?     @map("lost_reason")
+  contactedAt             DateTime?   @map("contacted_at") @db.Timestamptz
+  stageEnteredAt          DateTime    @default(now()) @map("stage_entered_at") @db.Timestamptz
+  externalCrmId           String?     @map("external_crm_id") @db.VarChar(100)
+  createdAt               DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  client              Client @relation(fields: [clientId], references: [id])
+  assignedSales       User?  @relation("SalesLeads", fields: [assignedSalesUserId], references: [id])
+  assignedEstimator   User?  @relation("EstimatorLeads", fields: [assignedEstimatorUserId], references: [id])
+  estimates           Estimate[]
+  jobs                Job[]
+  activityLogs        ActivityLog[]
+  alerts              Alert[]
+  documents           Document[]
+
+  @@index([stage])
+  @@index([source])
+  @@index([projectCity])
+  @@index([createdAt])
+  @@index([assignedEstimatorUserId])
+  @@index([clientId])
+  @@map("leads")
+}
+
+model OverheadProfile {
+  id                  String   @id @default(uuid()) @db.Uuid
+  name                String   @db.VarChar(100)
+  overheadPct         Decimal  @map("overhead_pct") @db.Decimal(5, 4)
+  fixedOverheadPerJob Decimal? @map("fixed_overhead_per_job") @db.Decimal(10, 2)
+  isDefault           Boolean  @default(false) @map("is_default")
+  effectiveDate       DateTime? @map("effective_date") @db.Date
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  estimates Estimate[]
+
+  @@map("overhead_profiles")
+}
+
+model MarginProfile {
+  id                      String   @id @default(uuid()) @db.Uuid
+  name                    String   @db.VarChar(100)
+  greenMinPct             Decimal  @map("green_min_pct") @db.Decimal(5, 4)
+  yellowMinPct            Decimal  @map("yellow_min_pct") @db.Decimal(5, 4)
+  redMinPct               Decimal  @map("red_min_pct") @db.Decimal(5, 4)
+  minJobCharge            Decimal  @map("min_job_charge") @db.Decimal(10, 2)
+  smallJobThreshold       Decimal  @map("small_job_threshold") @db.Decimal(10, 2)
+  smallJobFee             Decimal  @map("small_job_fee") @db.Decimal(10, 2)
+  rushMultiplier          Decimal  @map("rush_multiplier") @db.Decimal(4, 3)
+  rushMaterialSurchargePct Decimal @default(0) @map("rush_material_surcharge_pct") @db.Decimal(5, 4)
+  repeatLayoutDiscountPct Decimal  @map("repeat_layout_discount_pct") @db.Decimal(5, 4)
+  repeatLayoutMinUnits    Int      @default(4) @map("repeat_layout_min_units")
+  highValueThreshold      Decimal  @map("high_value_threshold") @db.Decimal(12, 2)
+  accessMultipliers       Json     @map("access_multipliers")
+  roundingIncrement       Decimal  @default(5) @map("rounding_increment") @db.Decimal(6, 2)
+  pricingMethod           String   @default("target_margin") @map("pricing_method") @db.VarChar(20)
+  defaultMarkupPct        Decimal? @map("default_markup_pct") @db.Decimal(5, 4)
+  isDefault               Boolean  @default(false) @map("is_default")
+  active                  Boolean  @default(true)
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  estimates Estimate[]
+
+  @@map("margin_profiles")
+}
+
+model Product {
+  id              String       @id @default(uuid()) @db.Uuid
+  sku             String       @unique @db.VarChar(50)
+  name            String       @db.VarChar(200)
+  serviceCode     ServiceCode  @map("service_code")
+  unit            QuantityType
+  unitCost        Decimal      @map("unit_cost") @db.Decimal(10, 4)
+  coveragePerUnit Decimal?     @map("coverage_per_unit") @db.Decimal(10, 4)
+  defaultWastePct Decimal      @map("default_waste_pct") @db.Decimal(5, 4)
+  manufacturer    String?      @db.VarChar(100)
+  specSheetUrl    String?      @map("spec_sheet_url")
+  rValuePerInch   Decimal?     @map("r_value_per_inch") @db.Decimal(4, 2)
+  description     String?
+  active          Boolean      @default(true)
+  effectiveDate   DateTime?    @map("effective_date") @db.Date
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  lineItems EstimateLineItem[]
+
+  @@index([serviceCode])
+  @@index([active])
+  @@map("products")
+}
+
+model LaborRate {
+  id              String   @id @default(uuid()) @db.Uuid
+  tradeCode       String   @map("trade_code") @db.VarChar(50)
+  tradeName       String   @map("trade_name") @db.VarChar(100)
+  burdenedRateHr  Decimal  @map("burdened_rate_hr") @db.Decimal(8, 2)
+  region          String   @default("boston_metro") @db.VarChar(50)
+  effectiveDate   DateTime? @map("effective_date") @db.Date
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  lineItems EstimateLineItem[]
+
+  @@index([tradeCode])
+  @@index([active])
+  @@map("labor_rates")
+}
+
+model ProductionRate {
+  id               String            @id @default(uuid()) @db.Uuid
+  serviceCode      ServiceCode       @map("service_code")
+  name             String            @db.VarChar(100)
+  unit             QuantityType
+  unitsPerHour     Decimal           @map("units_per_hour") @db.Decimal(10, 4)
+  crewSize         Int               @default(2) @map("crew_size")
+  accessDifficulty AccessDifficulty  @default(standard) @map("access_difficulty")
+  finishLevel      DrywallFinishLevel? @map("finish_level")
+  plasterSystem    PlasterSystem?    @map("plaster_system")
+  notes            String?
+  effectiveDate    DateTime?         @map("effective_date") @db.Date
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  lineItems EstimateLineItem[]
+
+  @@index([serviceCode, accessDifficulty, active])
+  @@map("production_rates")
+}
+
+model EquipmentRate {
+  id            String              @id @default(uuid()) @db.Uuid
+  code          String              @unique @db.VarChar(50)
+  name          String              @db.VarChar(100)
+  chargeType    EquipmentChargeType @map("charge_type")
+  rateAmount    Decimal             @map("rate_amount") @db.Decimal(10, 2)
+  allocationPct Decimal?            @map("allocation_pct") @db.Decimal(5, 4)
+  serviceCodes  ServiceCode[]       @map("service_codes")
+  active        Boolean             @default(true)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  lineItems EstimateLineItem[]
+
+  @@map("equipment_rates")
+}
+
+model Estimate {
+  id                String           @id @default(uuid()) @db.Uuid
+  estimateNumber    String           @unique @map("estimate_number") @db.VarChar(20)
+  leadId            String           @map("lead_id") @db.Uuid
+  clientId          String           @map("client_id") @db.Uuid
+  version           Int              @default(1)
+  parentEstimateId  String?          @map("parent_estimate_id") @db.Uuid
+  status            EstimateStatus   @default(draft)
+  estimateName      String           @map("estimate_name") @db.VarChar(255)
+  serviceType       ServiceCode      @map("service_type")
+  projectType       ProjectType      @map("project_type")
+  projectStreet     String?          @map("project_street") @db.VarChar(255)
+  projectCity       String?          @map("project_city") @db.VarChar(100)
+  projectState      String?          @map("project_state") @db.Char(2)
+  projectZip        String?          @map("project_zip") @db.VarChar(10)
+  accessDifficulty  AccessDifficulty @map("access_difficulty")
+  jobConditions     JobCondition[]   @map("job_conditions")
+  isRush            Boolean          @default(false) @map("is_rush")
+  isRepeatLayout    Boolean          @default(false) @map("is_repeat_layout")
+  repeatUnitCount   Int?             @map("repeat_unit_count")
+  marginTargetPct   Decimal          @map("margin_target_pct") @db.Decimal(5, 4)
+  marginProfileId   String           @map("margin_profile_id") @db.Uuid
+  overheadProfileId String           @map("overhead_profile_id") @db.Uuid
+  estimatorUserId   String           @map("estimator_user_id") @db.Uuid
+  approvedByUserId  String?          @map("approved_by_user_id") @db.Uuid
+  approvedAt        DateTime?        @map("approved_at") @db.Timestamptz
+  validUntil        DateTime         @map("valid_until") @db.Date
+  notesInternal     String?          @map("notes_internal")
+  notesClient       String?          @map("notes_client")
+  directCostTotal   Decimal?         @map("direct_cost_total") @db.Decimal(12, 2)
+  mobilizationCost  Decimal?         @map("mobilization_cost") @db.Decimal(10, 2)
+  smallJobFee       Decimal?         @map("small_job_fee") @db.Decimal(10, 2)
+  overheadCost      Decimal?         @map("overhead_cost") @db.Decimal(12, 2)
+  costBeforeProfit  Decimal?         @map("cost_before_profit") @db.Decimal(12, 2)
+  sellPrice         Decimal?         @map("sell_price") @db.Decimal(12, 2)
+  roundedPrice      Decimal?         @map("rounded_price") @db.Decimal(12, 2)
+  grossMarginPct    Decimal?         @map("gross_margin_pct") @db.Decimal(5, 4)
+  marginStatus      MarginStatus?    @map("margin_status")
+  approvalRequired  Boolean          @default(false) @map("approval_required")
+  minJobAdjusted    Boolean          @default(false) @map("min_job_adjusted")
+  isPreliminary     Boolean          @default(false) @map("is_preliminary")
+  calculationSnapshot Json?          @map("calculation_snapshot")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  lead            Lead            @relation(fields: [leadId], references: [id])
+  client          Client          @relation(fields: [clientId], references: [id])
+  marginProfile   MarginProfile   @relation(fields: [marginProfileId], references: [id])
+  overheadProfile OverheadProfile @relation(fields: [overheadProfileId], references: [id])
+  estimator       User            @relation("EstimatorEstimates", fields: [estimatorUserId], references: [id])
+  approvedBy      User?           @relation("ApprovedEstimates", fields: [approvedByUserId], references: [id])
+  parentEstimate  Estimate?       @relation("EstimateRevisions", fields: [parentEstimateId], references: [id])
+  childEstimates  Estimate[]      @relation("EstimateRevisions")
+  lineItems       EstimateLineItem[]
+  proposals       Proposal[]
+  marginOverrides MarginOverride[]
+  activityLogs    ActivityLog[]
+  documents       Document[]
+
+  @@index([leadId])
+  @@index([status])
+  @@index([estimatorUserId])
+  @@index([createdAt])
+  @@index([marginStatus])
+  @@map("estimates")
+}
+
+model EstimateLineItem {
+  id                  String              @id @default(uuid()) @db.Uuid
+  estimateId          String              @map("estimate_id") @db.Uuid
+  sortOrder           Int                 @map("sort_order")
+  serviceCode         ServiceCode         @map("service_code")
+  assemblyName        String              @map("assembly_name") @db.VarChar(255)
+  areaName            String?             @map("area_name") @db.VarChar(100)
+  quantityType        QuantityType        @map("quantity_type")
+  quantityRaw         Decimal             @map("quantity_raw") @db.Decimal(12, 4)
+  quantityNormalized  Decimal?            @map("quantity_normalized") @db.Decimal(12, 4)
+  thicknessInches     Decimal?            @map("thickness_inches") @db.Decimal(6, 2)
+  rValueTarget        Int?                @map("r_value_target")
+  productId           String              @map("product_id") @db.Uuid
+  wastePct            Decimal             @map("waste_pct") @db.Decimal(5, 4)
+  productionRateId    String              @map("production_rate_id") @db.Uuid
+  laborRateId         String              @map("labor_rate_id") @db.Uuid
+  equipmentRateId     String?             @map("equipment_rate_id") @db.Uuid
+  modifierIds         String[]            @map("modifier_ids") @db.Uuid
+  drywallFinishLevel  DrywallFinishLevel? @map("drywall_finish_level")
+  plasterSystem       PlasterSystem?      @map("plaster_system")
+  windowSizeTier      WindowSizeTier?     @map("window_size_tier")
+  windowCount         Int?                @map("window_count")
+  materialCost        Decimal?            @map("material_cost") @db.Decimal(12, 2)
+  laborHours          Decimal?            @map("labor_hours") @db.Decimal(10, 4)
+  laborCost           Decimal?            @map("labor_cost") @db.Decimal(12, 2)
+  equipmentCost       Decimal?            @map("equipment_cost") @db.Decimal(12, 2)
+  lineDirectCost      Decimal?            @map("line_direct_cost") @db.Decimal(12, 2)
+  clientDescription   String?             @map("client_description")
+  calculationDetail   Json?               @map("calculation_detail")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  estimate       Estimate       @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  product        Product        @relation(fields: [productId], references: [id])
+  productionRate ProductionRate @relation(fields: [productionRateId], references: [id])
+  laborRate      LaborRate      @relation(fields: [laborRateId], references: [id])
+  equipmentRate  EquipmentRate? @relation(fields: [equipmentRateId], references: [id])
+
+  @@index([estimateId])
+  @@index([serviceCode])
+  @@map("estimate_line_items")
+}
+
+model MarginOverride {
+  id                   String        @id @default(uuid()) @db.Uuid
+  estimateId           String        @map("estimate_id") @db.Uuid
+  userId               String        @map("user_id") @db.Uuid
+  reason               String
+  previousMarginStatus MarginStatus? @map("previous_margin_status")
+  newMarginStatus      MarginStatus? @map("new_margin_status")
+  previousSellPrice    Decimal?      @map("previous_sell_price") @db.Decimal(12, 2)
+  approvedToSend       Boolean       @map("approved_to_send")
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  estimate Estimate @relation(fields: [estimateId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("margin_overrides")
+}
+
+model TermsTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(100)
+  bodyHtml  String   @map("body_html")
+  isDefault Boolean  @default(false) @map("is_default")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  proposals Proposal[]
+
+  @@map("terms_templates")
+}
+
+model Proposal {
+  id                   String         @id @default(uuid()) @db.Uuid
+  proposalNumber       String         @unique @map("proposal_number") @db.VarChar(20)
+  estimateId           String         @map("estimate_id") @db.Uuid
+  version              Int            @default(1)
+  status               ProposalStatus @default(draft)
+  isPreliminary        Boolean        @default(false) @map("is_preliminary")
+  depositPct           Decimal        @default(0.5) @map("deposit_pct") @db.Decimal(5, 4)
+  depositAmount        Decimal?       @map("deposit_amount") @db.Decimal(12, 2)
+  approvedAmount       Decimal?       @map("approved_amount") @db.Decimal(12, 2)
+  scopeJson            Json?          @map("scope_json")
+  assumptionsJson      Json?          @map("assumptions_json")
+  exclusionsJson       Json?          @map("exclusions_json")
+  scheduleStartWindow  String?        @map("schedule_start_window") @db.VarChar(100)
+  scheduleDurationDays Int?           @map("schedule_duration_days")
+  termsTemplateId      String?        @map("terms_template_id") @db.Uuid
+  pdfUrl               String?        @map("pdf_url")
+  pdfHash              String?        @map("pdf_hash") @db.VarChar(64)
+  viewToken            String         @unique @map("view_token") @db.VarChar(64)
+  sentAt               DateTime?      @map("sent_at") @db.Timestamptz
+  sentByUserId         String?        @map("sent_by_user_id") @db.Uuid
+  viewedAt             DateTime?      @map("viewed_at") @db.Timestamptz
+  viewCount            Int            @default(0) @map("view_count")
+  clientApprovedAt     DateTime?      @map("client_approved_at") @db.Timestamptz
+  clientDeclinedAt     DateTime?      @map("client_declined_at") @db.Timestamptz
+  declineReason        String?        @map("decline_reason")
+  signatureData        Json?          @map("signature_data")
+  internalApprovedBy   String?        @map("internal_approved_by") @db.Uuid
+  internalApprovedAt   DateTime?      @map("internal_approved_at") @db.Timestamptz
+  expiresAt            DateTime?      @map("expires_at") @db.Date
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  estimate         Estimate       @relation(fields: [estimateId], references: [id])
+  termsTemplate    TermsTemplate? @relation(fields: [termsTemplateId], references: [id])
+  sentBy           User?          @relation("SentProposals", fields: [sentByUserId], references: [id])
+  internalApprover User?          @relation("InternalApprovedProposals", fields: [internalApprovedBy], references: [id])
+  job              Job?
+  activityLogs     ActivityLog[]
+  alerts           Alert[]
+
+  @@index([estimateId])
+  @@index([status])
+  @@index([sentAt])
+  @@map("proposals")
+}
+
+model Job {
+  id                        String    @id @default(uuid()) @db.Uuid
+  jobNumber                 String    @unique @map("job_number") @db.VarChar(20)
+  proposalId                String    @unique @map("proposal_id") @db.Uuid
+  leadId                    String    @map("lead_id") @db.Uuid
+  clientId                  String    @map("client_id") @db.Uuid
+  status                    JobStatus @default(pending_schedule)
+  contractAmount            Decimal   @map("contract_amount") @db.Decimal(12, 2)
+  depositReceived           Decimal   @default(0) @map("deposit_received") @db.Decimal(12, 2)
+  scheduledStart            DateTime? @map("scheduled_start") @db.Date
+  actualStart               DateTime? @map("actual_start") @db.Date
+  substantialCompletionDate DateTime? @map("substantial_completion_date") @db.Date
+  grossMarginPctAtSale      Decimal?  @map("gross_margin_pct_at_sale") @db.Decimal(5, 4)
+  projectAddress            Json?     @map("project_address")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  proposal     Proposal @relation(fields: [proposalId], references: [id])
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  client       Client   @relation(fields: [clientId], references: [id])
+  activityLogs ActivityLog[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([createdAt])
+  @@map("jobs")
+}
+
+model ActivityLog {
+  id         String            @id @default(uuid()) @db.Uuid
+  eventType  ActivityEventType @map("event_type")
+  leadId     String?           @map("lead_id") @db.Uuid
+  estimateId String?           @map("estimate_id") @db.Uuid
+  proposalId String?           @map("proposal_id") @db.Uuid
+  jobId      String?           @map("job_id") @db.Uuid
+  clientId   String?           @map("client_id") @db.Uuid
+  userId     String?           @map("user_id") @db.Uuid
+  payload    Json?
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  lead     Lead?     @relation(fields: [leadId], references: [id])
+  estimate Estimate? @relation(fields: [estimateId], references: [id])
+  proposal Proposal? @relation(fields: [proposalId], references: [id])
+  job      Job?      @relation(fields: [jobId], references: [id])
+  client   Client?   @relation(fields: [clientId], references: [id])
+  user     User?     @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([leadId])
+  @@index([eventType])
+  @@index([estimateId])
+  @@map("activity_logs")
+}
+
+model Alert {
+  id             String    @id @default(uuid()) @db.Uuid
+  alertType      String    @map("alert_type") @db.VarChar(50)
+  severity       String    @db.VarChar(20)
+  leadId         String?   @map("lead_id") @db.Uuid
+  estimateId     String?   @map("estimate_id") @db.Uuid
+  proposalId     String?   @map("proposal_id") @db.Uuid
+  message        String
+  isRead         Boolean   @default(false) @map("is_read")
+  isDismissed    Boolean   @default(false) @map("is_dismissed")
+  assignedUserId String?   @map("assigned_user_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz
+
+  lead         Lead?     @relation(fields: [leadId], references: [id])
+  proposal     Proposal? @relation(fields: [proposalId], references: [id])
+  assignedUser User?     @relation(fields: [assignedUserId], references: [id])
+
+  @@index([assignedUserId, isRead])
+  @@map("alerts")
+}
+
+model Document {
+  id               String   @id @default(uuid()) @db.Uuid
+  leadId           String?  @map("lead_id") @db.Uuid
+  estimateId       String?  @map("estimate_id") @db.Uuid
+  fileName         String   @map("file_name") @db.VarChar(255)
+  fileUrl          String   @map("file_url")
+  mimeType         String   @map("mime_type") @db.VarChar(100)
+  uploadedByUserId String   @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  lead       Lead?     @relation(fields: [leadId], references: [id])
+  estimate   Estimate? @relation(fields: [estimateId], references: [id])
+  uploadedBy User      @relation(fields: [uploadedByUserId], references: [id])
+
+  @@map("documents")
+}
+
+model MarketingAdSpend {
+  id          String     @id @default(uuid()) @db.Uuid
+  source      LeadSource
+  periodStart DateTime   @map("period_start") @db.Date
+  periodEnd   DateTime   @map("period_end") @db.Date
+  amount      Decimal    @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([source, periodStart, periodEnd])
+  @@map("marketing_ad_spend")
+}
