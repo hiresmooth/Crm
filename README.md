@@ -28,14 +28,27 @@ npm run dev          # http://localhost:3000
 
 ## Production Deploy
 
+**Full guide:** [docs/DEPLOY.md](docs/DEPLOY.md)
+
+### Fastest permanent hosting (Render — free)
+
+1. Go to https://dashboard.render.com/blueprints
+2. **New Blueprint Instance** → connect GitHub repo `hiresmooth/Crm`
+3. Wait for deploy → open the URL Render provides
+4. Set `NEXT_PUBLIC_APP_URL` in Render env to that URL → redeploy
+
+### Local production
+
 ```bash
-# PostgreSQL required
 cp .env.example .env   # set AUTH_SECRET, DATABASE_URL
-npm install && npm run db:setup && npm run build && npm run start:prod
-# Or: docker compose up --build
+bash scripts/deploy-production.sh
 ```
 
-**Live locally:** http://localhost:3000
+### Verify
+
+```bash
+E2E_BASE_URL=https://your-app-url npm run e2e
+```
 
 ## Features
 

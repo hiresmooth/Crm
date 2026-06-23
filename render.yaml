@@ -1,0 +1,44 @@
+# Render Blueprint — one-click deploy for SmoothOS Estimate
+# https://render.com/docs/blueprint-spec
+#
+# Setup (no code knowledge needed):
+# 1. Go to https://dashboard.render.com/blueprints
+# 2. Click "New Blueprint Instance"
+# 3. Connect GitHub repo: hiresmooth/Crm
+# 4. Render creates the database + web service automatically
+# 5. Open the web service URL and log in
+
+databases:
+  - name: smoothos-db
+    plan: free
+    databaseName: smoothos
+    user: smoothos
+
+services:
+  - type: web
+    name: smoothos-estimate
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm ci && npx prisma generate && npx prisma db push && npx tsx prisma/seed.ts && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smoothos-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+    disk:
+      name: smoothos-uploads
+      mountPath: /var/data/uploads
+      sizeGB: 1
