@@ -1,3 +1,7 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 import { prisma } from '@/lib/prisma';
 import { apiError, apiSuccess } from '@/lib/api';
 import { emitEvent } from '@/lib/events';

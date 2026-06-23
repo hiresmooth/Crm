@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'cursor/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: smoothos
+          POSTGRES_PASSWORD: smoothos
+          POSTGRES_DB: smoothos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm test
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://smoothos:smoothos@localhost:5432/smoothos?schema=public
+          AUTH_SECRET: ci-test-secret-minimum-32-characters-long

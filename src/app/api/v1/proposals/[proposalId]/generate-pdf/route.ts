@@ -1,6 +1,11 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 import { apiError, apiSuccess } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 import { renderProposalPdf } from '@/lib/pdf/render-proposal';
+import { saveFile } from '@/lib/storage';
 
 export async function GET(
   _request: Request,
@@ -43,7 +48,6 @@ export async function POST(
   if (!proposal) return apiError([{ code: 'NOT_FOUND', message: 'Proposal not found' }], 404);
 
   const pdfBuffer = await renderProposalPdf(proposal);
-  const pdfBase64 = pdfBuffer.toString('base64');
   const pdfHash = await crypto.subtle
     .digest('SHA-256', new Uint8Array(pdfBuffer))
     .then((buf) =>
@@ -52,7 +56,8 @@ export async function POST(
         .join('')
     );
 
-  const pdfUrl = `data:application/pdf;base64,${pdfBase64}`;
+  const filename = `${proposal.proposalNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+  const pdfUrl = await saveFile(filename, pdfBuffer);
 
   const updated = await prisma.proposal.update({
     where: { id: proposal.id },

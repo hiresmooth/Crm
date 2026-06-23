@@ -126,4 +126,27 @@ describe('pricing engine', () => {
     expect(result.equipment_cost).toBe(0);
     expect(result.line_direct_cost).toBeGreaterThan(1000);
   });
+
+  const serviceCases: { service: LineItemInput['service_code']; extra: Partial<LineItemInput> }[] = [
+    { service: 'basement_insulation', extra: { thickness_inches: 2, product: { unit_cost: 1.2, unit: 'sq_ft', default_waste_pct: 0.05 } } },
+    { service: 'crawl_space_insulation', extra: { thickness_inches: 2, product: { unit_cost: 1.1, unit: 'sq_ft', default_waste_pct: 0.05 } } },
+    { service: 'blow_in_insulation', extra: { thickness_inches: 12, r_value_target: 38, product: { unit_cost: 0.42, unit: 'sq_ft', default_waste_pct: 0.05, r_value_per_inch: 3.7 } } },
+    { service: 'air_sealing', extra: { quantity_type: 'linear_ft', quantity_raw: 200, penetration_count: 5, product: { unit_cost: 0.85, unit: 'linear_ft', default_waste_pct: 0.05 } } },
+    { service: 'drywall', extra: { drywall_finish_level: 'level_4', product: { unit_cost: 2.85, unit: 'sq_ft', default_waste_pct: 0.1 } } },
+    { service: 'plastering', extra: { plaster_system: 'skim_coat', product: { unit_cost: 4.5, unit: 'sq_ft', default_waste_pct: 0.08 } } },
+    { service: 'open_cell_foam', extra: { thickness_inches: 5.5, product: { unit_cost: 0.62, unit: 'sq_ft', default_waste_pct: 0.1 } } },
+  ];
+
+  for (const { service, extra } of serviceCases) {
+    it(`calculates ${service}`, () => {
+      const input: LineItemInput = {
+        ...baseInput(),
+        service_code: service,
+        quantity_raw: 800,
+        ...extra,
+      } as LineItemInput;
+      const result = calculateLineItem(input);
+      expect(result.line_direct_cost).toBeGreaterThan(0);
+    });
+  }
 });

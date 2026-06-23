@@ -1,9 +1,15 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 import { apiError, apiSuccess } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/events';
 import { sendProposalEmail } from '@/lib/email';
 import { getSession } from '@/lib/auth';
 import { canSendProposals } from '@/lib/permissions';
+import { canSendProposalForEstimate } from '@/lib/estimate-service';
+import { readStoredFile } from '@/lib/storage';
 
 export async function POST(
   request: Request,
@@ -28,15 +34,24 @@ export async function POST(
     return apiError([{ code: 'NO_PDF', message: 'Generate PDF before sending' }], 422);
   }
 
+  const sendCheck = await canSendProposalForEstimate(proposal.estimateId);
+  if (!sendCheck.ok) {
+    return apiError([{ code: 'MARGIN_LOCK', message: sendCheck.reason ?? 'Cannot send proposal' }], 422);
+  }
+
   const toEmail = body.to_email ?? proposal.estimate.lead.client.email;
   if (!toEmail) return apiError([{ code: 'NO_EMAIL', message: 'Client email required' }], 422);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const clientViewUrl = `${baseUrl}/proposals/view/${proposal.viewToken}`;
 
-  const pdfBase64 = proposal.pdfUrl.startsWith('data:')
-    ? proposal.pdfUrl.split(',')[1]
-    : undefined;
+  let pdfBase64: string | undefined;
+  if (proposal.pdfUrl.startsWith('data:')) {
+    pdfBase64 = proposal.pdfUrl.split(',')[1];
+  } else if (proposal.pdfUrl.startsWith('/api/v1/files/')) {
+    const filename = proposal.pdfUrl.replace('/api/v1/files/', '');
+    pdfBase64 = (await readStoredFile(filename)).toString('base64');
+  }
 
   await sendProposalEmail({
     to: toEmail,

@@ -23,6 +23,19 @@ npm run dev          # http://localhost:3000
 | Phase 1 — Core Revenue Engine | ✅ Complete |
 | Phase 2 — Dashboard + Analytics + CRM | ✅ Complete |
 | Phase 3 — Automation + Jobs + Batch | ✅ Complete |
+| E2E golden path | ✅ Passing (`npm run e2e`) |
+| Unit tests | ✅ 12 pricing engine tests |
+
+## Production Deploy
+
+```bash
+# PostgreSQL required
+cp .env.example .env   # set AUTH_SECRET, DATABASE_URL
+npm install && npm run db:setup && npm run build && npm run start:prod
+# Or: docker compose up --build
+```
+
+**Live locally:** http://localhost:3000
 
 ## Features
 

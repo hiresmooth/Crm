@@ -1,3 +1,7 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 import { z } from 'zod';
 import type { Prisma, ServiceCode, QuantityType } from '@prisma/client';
 import { calculateEstimate } from '@/lib/pricing-engine';

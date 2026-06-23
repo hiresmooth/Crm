@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Card, formatCurrency, StatusBadge } from '@/components/AppShell';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
+import { DocumentUpload, LeadStageActions } from '@/components/LeadActions';
 
 export default async function LeadDetailPage({ params }: { params: { leadId: string } }) {
   let lead;
@@ -26,6 +27,8 @@ export default async function LeadDetailPage({ params }: { params: { leadId: str
     orderBy: { createdAt: 'desc' },
   });
 
+  const documents = await prisma.document.findMany({ where: { leadId: lead.id }, orderBy: { createdAt: 'desc' } });
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -33,8 +36,9 @@ export default async function LeadDetailPage({ params }: { params: { leadId: str
           <h1 className="text-2xl font-bold">{lead.leadNumber}</h1>
           <p className="text-gray-500">{lead.client.firstName} {lead.client.lastName} · {lead.projectCity}, MA</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 items-end">
           <StatusBadge status={lead.stage} />
+          <LeadStageActions leadId={lead.id} currentStage={lead.stage} />
           <Link href={`/estimates/new?leadId=${lead.id}`} className="bg-smooth-orange text-white px-4 py-2 rounded-md text-sm font-medium">
             Create Estimate
           </Link>
@@ -112,6 +116,18 @@ export default async function LeadDetailPage({ params }: { params: { leadId: str
         </div>
 
         <div className="space-y-4">
+          <Card title="Documents">
+            <DocumentUpload leadId={lead.id} />
+            <ul className="mt-3 space-y-1 text-sm">
+              {documents.map((d) => (
+                <li key={d.id}>
+                  <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-smooth-orange">{d.fileName}</a>
+                </li>
+              ))}
+              {documents.length === 0 && <p className="text-gray-400 text-sm">No documents</p>}
+            </ul>
+          </Card>
+
           <Card title="Assignment">
             <div className="text-sm">
               <div className="text-gray-500">Estimator</div>

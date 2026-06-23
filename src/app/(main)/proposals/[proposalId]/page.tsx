@@ -3,6 +3,7 @@ import { Card, formatCurrency, StatusBadge } from '@/components/AppShell';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { ProposalActions } from '@/components/ProposalActions';
+import { ProposalEditor } from '@/components/ProposalEditor';
 
 export default async function ProposalDetailPage({ params }: { params: { proposalId: string } }) {
   const proposal = await prisma.proposal.findUnique({
@@ -41,6 +42,16 @@ export default async function ProposalDetailPage({ params }: { params: { proposa
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {['draft', 'internal_review'].includes(proposal.status) ? (
+            <Card title="Edit Scope">
+              <ProposalEditor
+                proposalId={proposal.id}
+                initialScope={scope}
+                clientEmail={proposal.estimate.lead.client.email}
+              />
+            </Card>
+          ) : (
+            <>
           <Card title="Scope of Work">
             {scope?.project_summary && <p className="text-sm mb-4">{scope.project_summary}</p>}
             {(scope?.scope_of_work ?? []).map((section, i) => (
@@ -59,6 +70,8 @@ export default async function ProposalDetailPage({ params }: { params: { proposa
                 {scope.exclusions.map((e, i) => <li key={i}>{e}</li>)}
               </ul>
             </Card>
+          )}
+            </>
           )}
         </div>
 

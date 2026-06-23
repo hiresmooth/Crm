@@ -12,7 +12,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma db push && tsx prisma/seed.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "e2e": "node scripts/e2e.mjs",
+    "start:prod": "next start -p 3000"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

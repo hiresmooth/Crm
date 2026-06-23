@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { Card, formatCurrency, StatusBadge } from '@/components/AppShell';
+import { Card, formatCurrency } from '@/components/AppShell';
+import { JobStatusSelect } from '@/components/JobActions';
 import { prisma } from '@/lib/prisma';
 
 export default async function JobsPage() {
@@ -37,7 +37,7 @@ export default async function JobsPage() {
                 <td className="py-2 font-medium">{job.jobNumber}</td>
                 <td>{job.client.firstName} {job.client.lastName}</td>
                 <td>{job.lead.projectCity}</td>
-                <td><StatusBadge status={job.status} /></td>
+                <td><JobStatusSelect jobId={job.id} currentStatus={job.status} /></td>
                 <td>{formatCurrency(job.contractAmount)}</td>
                 <td>{job.grossMarginPctAtSale ? `${(Number(job.grossMarginPctAtSale) * 100).toFixed(1)}%` : '—'}</td>
                 <td>{job.proposal.proposalNumber}</td>
