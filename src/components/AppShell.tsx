@@ -1,47 +1,66 @@
 import Link from 'next/link';
 import { clsx } from 'clsx';
+import type { SessionUser } from '@/lib/auth';
+import { LogoutButton } from '@/components/LogoutButton';
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/leads', label: 'Leads' },
   { href: '/estimates', label: 'Estimates' },
   { href: '/proposals', label: 'Proposals' },
+  { href: '/jobs', label: 'Jobs' },
   { href: '/admin/rates', label: 'Rate Tables' },
+  { href: '/admin/crm', label: 'CRM', adminOnly: true },
+  { href: '/admin/ad-spend', label: 'Ad Spend', adminOnly: true },
+  { href: '/estimates/batch', label: 'Batch Estimator' },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, user }: { children: React.ReactNode; user: SessionUser | null }) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-smooth-black text-white border-b-4 border-smooth-orange">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-smooth-orange rounded" />
+            <div className="w-8 h-8 bg-smooth-orange rounded shrink-0" />
             <div>
               <div className="font-bold text-lg leading-tight">SmoothOS Estimate</div>
-              <div className="text-xs text-gray-400">Smooth Construction Services · Boston, MA</div>
+              <div className="text-xs text-gray-400 hidden sm:block">Smooth Construction Services · Boston, MA</div>
             </div>
           </div>
-          <div className="text-xs text-gray-400">Phase 1 — Core Revenue Engine</div>
+          <div className="flex items-center gap-3 text-sm">
+            {user && (
+              <>
+                <span className="text-gray-300 hidden md:inline">
+                  {user.firstName} {user.lastName}
+                  <span className="text-gray-500 ml-1">({user.role})</span>
+                </span>
+                <LogoutButton />
+              </>
+            )}
+          </div>
         </div>
       </header>
       <div className="flex flex-1 max-w-7xl mx-auto w-full">
         <aside className="w-52 shrink-0 border-r bg-white p-4 hidden md:block">
           <nav className="space-y-1">
-            {nav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  'block px-3 py-2 rounded-md text-sm font-medium',
-                  'text-gray-700 hover:bg-orange-50 hover:text-smooth-orange'
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {nav.map((item) => {
+              if (item.adminOnly && user?.role !== 'admin') return null;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(
+                    'block px-3 py-2 rounded-md text-sm font-medium',
+                    'text-gray-700 hover:bg-orange-50 hover:text-smooth-orange'
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </aside>
-        <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 md:p-6 overflow-auto min-w-0">{children}</main>
       </div>
     </div>
   );

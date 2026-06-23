@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { apiError, apiSuccess, nextNumber } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
+import { emitEvent } from '@/lib/events';
 
 const leadSchema = z.object({
   source: z.enum([
@@ -97,12 +98,24 @@ export async function POST(request: NextRequest) {
     include: { client: true },
   });
 
-  await prisma.activityLog.create({
-    data: {
-      eventType: 'lead_created',
-      leadId: lead.id,
-      clientId: client.id,
-      payload: { source: data.source, service_type: data.service_type },
+  await emitEvent({
+    eventType: 'lead_created',
+    leadId: lead.id,
+    clientId: client.id,
+    payload: { source: data.source, service_type: data.service_type },
+    crmPayload: {
+      lead_id: lead.id,
+      lead_number: lead.leadNumber,
+      source: data.source,
+      service_type: data.service_type,
+      client: {
+        first_name: client.firstName,
+        last_name: client.lastName,
+        email: client.email,
+        phone: client.phone,
+      },
+      project: { city: data.project.city, state: data.project.state, zip: data.project.zip },
+      stage: lead.stage,
     },
   });
 

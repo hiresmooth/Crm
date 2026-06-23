@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Prisma, ServiceCode, QuantityType } from '@prisma/client';
 import { calculateEstimate } from '@/lib/pricing-engine';
 import { apiError, apiSuccess, nextNumber } from '@/lib/api';
+import { emitEvent } from '@/lib/events';
 import { buildLineItemInput, loadRateContext, marginProfileToInput } from '@/lib/estimate-calc';
 import { prisma } from '@/lib/prisma';
 
@@ -232,13 +233,21 @@ export async function POST(request: Request) {
     data: { stage: 'estimate_in_progress', estimatedValue: rollup.rounded_price },
   });
 
-  await prisma.activityLog.create({
-    data: {
-      eventType: 'estimate_created',
-      leadId: lead.id,
-      estimateId: estimate.id,
-      userId: estimator.id,
-      payload: { estimate_number: estimateNumber, rounded_price: rollup.rounded_price },
+  await emitEvent({
+    eventType: 'estimate_created',
+    leadId: lead.id,
+    estimateId: estimate.id,
+    userId: estimator.id,
+    payload: { estimate_number: estimateNumber, rounded_price: rollup.rounded_price },
+    crmPayload: {
+      estimate_id: estimate.id,
+      estimate_number: estimateNumber,
+      lead_id: lead.id,
+      status: estimate.status,
+      rounded_price: rollup.rounded_price,
+      gross_margin_pct: rollup.gross_margin_pct,
+      service_type: data.service_type,
+      line_item_count: data.line_items.length,
     },
   });
 

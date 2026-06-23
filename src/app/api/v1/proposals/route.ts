@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { apiError, apiSuccess, nextNumber } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
-import { generateProposalScope } from '@/lib/proposal-scope';
+import { generateProposalScopeWithAi } from '@/lib/ai/proposal-writer';
 
 const proposalSchema = z.object({
   estimate_id: z.string().uuid(),
@@ -49,9 +49,10 @@ export async function POST(request: Request) {
   const approvedAmount = Number(estimate.roundedPrice ?? 0);
   const depositAmount = Math.round(approvedAmount * data.deposit_pct * 100) / 100;
 
-  const scopeJson = data.generate_scope_ai
-    ? generateProposalScope(estimate)
+  const scopeResult = data.generate_scope_ai
+    ? await generateProposalScopeWithAi(estimate, data.schedule)
     : { project_summary: '', scope_of_work: [], assumptions: [], exclusions: [] };
+  const { _source, ...scopeJson } = scopeResult as typeof scopeResult & { _source?: string };
 
   const count = await prisma.proposal.count();
   const proposalNumber = nextNumber('SCS', count + 1).replace('SCS-', 'SCS-');

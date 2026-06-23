@@ -1,96 +1,92 @@
 # SmoothOS Estimate — Smooth Construction Services
 
-Implementation-ready system for formula-driven estimating, branded proposal generation, and live revenue dashboards.
+Complete internal revenue system: formula-driven estimating, branded proposals, live dashboards, CRM webhooks, and job tracking.
 
-**Company:** Smooth Construction Services · Boston, MA  
-**Services:** Spray foam, attic/basement/crawl insulation, blow-in, air sealing, weatherization, drywall, plastering, window replacement
-
-**Status:** Phase 1 (Core Revenue Engine) implemented — see [What's Built](#whats-built-phase-1) below.
+**Company:** Smooth Construction Services · Boston, MA
 
 ## Quick Start
 
 ```bash
-# Prerequisites: Node 20+, PostgreSQL 16+
 cp .env.example .env
+# Set AUTH_SECRET to a long random string
 npm install
-npm run db:setup    # prisma db push + seed
-npm run dev         # http://localhost:3000
+npm run db:setup
+npm run dev          # http://localhost:3000
 ```
 
-**Seed logins** (for future auth): `admin@smoothconstruction.com` / `smooth2025!`
+**Login:** `estimator@smoothconstruction.com` / `smooth2025!` (also admin, manager)
 
-**Sample lead:** `L-2025-00001` — Maria Santos, Somerville attic insulation
+## System Status
 
-## What's Built (Phase 1)
+| Phase | Status |
+|-------|--------|
+| Phase 1 — Core Revenue Engine | ✅ Complete |
+| Phase 2 — Dashboard + Analytics + CRM | ✅ Complete |
+| Phase 3 — Automation + Jobs + Batch | ✅ Complete |
 
-| Module | Status |
-|--------|--------|
-| Formula pricing engine (10 services) | ✅ `src/lib/pricing-engine/` |
-| Unit tests (pricing engine) | ✅ `npm test` |
-| PostgreSQL schema + Prisma | ✅ `prisma/schema.prisma` |
-| Rate table seed data | ✅ `prisma/seed.ts` |
-| Lead intake API + UI | ✅ |
-| Estimate create/calculate/submit/approve | ✅ |
-| Margin guardrails (green/yellow/red) | ✅ |
-| Proposal generation + scope writer | ✅ |
-| Branded PDF proposals | ✅ `@react-pdf/renderer` |
-| Client proposal view + approve | ✅ |
-| Basic executive dashboard | ✅ |
-| Rate tables admin (read-only) | ✅ |
+## Features
+
+### Pricing & Estimating
+- Formula engine for 10 services (no AI pricing)
+- Margin guardrails (green/yellow/red)
+- Manager approval workflow
+- Multifamily batch estimator (`/estimates/batch`)
+
+### Proposals
+- Branded PDF generation
+- AI scope writing (Anthropic API when `ANTHROPIC_API_KEY` set; rules fallback otherwise)
+- Email send via Resend (`RESEND_API_KEY`)
+- Client e-sign portal (`/proposals/view/{token}`)
+- Approve / decline with job creation
+
+### Dashboard & Alerts
+- Executive KPIs, pipeline funnel, revenue trend
+- Service performance, marketing sources, estimator metrics
+- Live alerts: stale leads, low margin, high value, follow-up overdue
+- Cron: `POST /api/cron/alerts` with `x-cron-secret` header
+
+### CRM Integration
+- Webhook dispatcher for HubSpot, GoHighLevel, Zoho, Airtable, SmoothOS native
+- Configure at `/admin/crm` or via env webhook URLs
+- Events: lead.created, estimate.summary, proposal.sent, proposal.approved, job.created
+
+### Admin
+- Editable product rate table (`/admin/rates`)
+- Marketing ad spend + CPL (`/admin/ad-spend`)
+- CRM integration config (`/admin/crm`)
+
+### Auth & RBAC
+- JWT session cookies
+- Roles: admin, manager, estimator, sales, office
+- Middleware protects all internal routes
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [01-system-design.md](docs/smoothos/01-system-design.md) | Full system overview (sections 1–14) |
-| [02-database-schema.md](docs/smoothos/02-database-schema.md) | PostgreSQL schema, enums, indexes |
-| [03-estimator-formulas.md](docs/smoothos/03-estimator-formulas.md) | Per-service calculation logic |
-| [04-ui-specification.md](docs/smoothos/04-ui-specification.md) | Estimator, proposal, dashboard, lead detail UI |
-| [05-api-contract.md](docs/smoothos/05-api-contract.md) | REST API v1 contract |
+| Document | Path |
+|----------|------|
+| System design | `docs/smoothos/01-system-design.md` |
+| Database schema | `docs/smoothos/02-database-schema.md` |
+| Estimator formulas | `docs/smoothos/03-estimator-formulas.md` |
+| UI specification | `docs/smoothos/04-ui-specification.md` |
+| API contract | `docs/smoothos/05-api-contract.md` |
 
-## Database
+## Environment Variables
 
-Prisma schema: `prisma/schema.prisma`
+See `.env.example` for full list. Required:
+- `DATABASE_URL`
+- `AUTH_SECRET`
 
-```bash
-export DATABASE_URL="postgresql://user:pass@localhost:5432/smoothos"
-npm run db:setup
-```
+Optional:
+- `ANTHROPIC_API_KEY` — AI proposal scope
+- `RESEND_API_KEY` — proposal email
+- `HUBSPOT_WEBHOOK_URL` / `CRM_WEBHOOK_URL` — CRM sync
+- `CRON_SECRET` — alerts cron endpoint
 
-## Architecture
-
-- **Pricing:** Formula engine + editable rate tables (no AI pricing)
-- **Proposals:** PDF generation from approved estimates; AI for scope language only
-- **Dashboard:** Live KPIs from lead → estimate → proposal → job funnel
-- **CRM:** Webhook adapters for HubSpot, GoHighLevel, Zoho, Airtable, SmoothOS native
-
-## Workflow
-
-```
-Lead → Estimate (formula calc) → Submit → Manager Approve
-  → Proposal (scope from lines) → PDF → Internal Approve → Send
-  → Client views/approves → Job created
-```
-
-## API Endpoints
-
-- `POST /api/v1/leads` — lead intake
-- `POST /api/v1/estimates` — create + calculate
-- `POST /api/v1/estimates/:id/submit` — submit for review
-- `POST /api/v1/estimates/:id/approve` — manager approve
-- `POST /api/v1/proposals` — generate proposal
-- `POST /api/v1/proposals/:id/generate-pdf` — branded PDF
-- `POST /api/v1/proposals/:id/send` — send to client
-- `GET /api/v1/dashboard/executive` — KPIs
-
-## Implementation Phases
-
-1. **Phase 1** — Core revenue engine (estimator, formulas, approval, basic PDF) — **done**
-2. **Phase 2** — Dashboard analytics, alerts, CRM webhooks, controlled AI scope, auth/RBAC
-3. **Phase 3** — Advanced automation, e-sign, multifamily batch, jobs handoff
-
-## Docker (optional)
+## Cron (Alerts)
 
 ```bash
-docker compose up -d   # PostgreSQL on :5432
+curl -X POST http://localhost:3000/api/cron/alerts \
+  -H "x-cron-secret: your-cron-secret"
 ```
+
+Schedule every 15 minutes in production.

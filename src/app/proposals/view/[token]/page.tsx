@@ -1,8 +1,16 @@
 import { Card, formatCurrency } from '@/components/AppShell';
+import { ClientProposalActions } from '@/components/ClientProposalActions';
 import { prisma } from '@/lib/prisma';
+import { emitEvent } from '@/lib/events';
 import { notFound } from 'next/navigation';
 
-export default async function ClientProposalViewPage({ params }: { params: { token: string } }) {
+export default async function ClientProposalViewPage({
+  params,
+  searchParams,
+}: {
+  params: { token: string };
+  searchParams: { approved?: string };
+}) {
   const proposal = await prisma.proposal.findUnique({
     where: { viewToken: params.token },
     include: {
@@ -17,14 +25,35 @@ export default async function ClientProposalViewPage({ params }: { params: { tok
 
   if (!proposal) notFound();
 
-  if (!proposal.viewedAt) {
+  if (!proposal.viewedAt && proposal.status === 'sent') {
     await prisma.proposal.update({
       where: { id: proposal.id },
-      data: { viewedAt: new Date(), viewCount: { increment: 1 }, status: proposal.status === 'sent' ? 'viewed' : proposal.status },
+      data: { viewedAt: new Date(), viewCount: { increment: 1 }, status: 'viewed' },
+    });
+    await emitEvent({
+      eventType: 'proposal_viewed',
+      leadId: proposal.estimate.leadId,
+      proposalId: proposal.id,
+      payload: { proposal_number: proposal.proposalNumber },
     });
   }
 
-  const scope = proposal.scopeJson as { project_summary?: string; scope_of_work?: { heading: string; bullets: string[] }[] } | null;
+  const scope = proposal.scopeJson as {
+    project_summary?: string;
+    scope_of_work?: { heading: string; bullets: string[] }[];
+    exclusions?: string[];
+  } | null;
+
+  if (searchParams.approved === '1' || proposal.status === 'client_approved') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white border rounded-lg p-8 text-center max-w-md">
+          <div className="text-2xl font-bold text-green-700 mb-2">Approved</div>
+          <p className="text-gray-600">Thank you. Smooth Construction Services will contact you to collect deposit and schedule.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -46,19 +75,25 @@ export default async function ClientProposalViewPage({ params }: { params: { tok
             <div key={i} className="mb-3">
               <h3 className="font-semibold">{s.heading}</h3>
               <ul className="list-disc list-inside text-sm text-gray-700">
-                {s.bullets.map((b, j) => <li key={j}>{b}</li>)}
+                {s.bullets.map((b, j) => (
+                  <li key={j}>{b}</li>
+                ))}
               </ul>
             </div>
           ))}
         </Card>
 
-        <form action={`/api/v1/public/proposals/${params.token}/approve`} method="POST" className="bg-white border rounded-lg p-4">
-          <h3 className="font-semibold mb-2">Approve Proposal</h3>
-          <p className="text-xs text-gray-500 mb-3">By approving, you agree to the terms and authorize Smooth Construction Services to proceed upon deposit.</p>
-          <button type="submit" className="w-full bg-smooth-orange text-white py-3 rounded-md font-medium">
-            Approve — {formatCurrency(proposal.approvedAmount)}
-          </button>
-        </form>
+        {scope?.exclusions && scope.exclusions.length > 0 && (
+          <Card title="Exclusions">
+            <ul className="list-disc list-inside text-sm text-gray-600">
+              {scope.exclusions.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        <ClientProposalActions token={params.token} amount={Number(proposal.approvedAmount)} />
       </main>
     </div>
   );

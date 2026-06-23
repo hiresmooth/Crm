@@ -1,7 +1,14 @@
 import { Card } from '@/components/AppShell';
+import { ProductEditForm } from '@/components/ProductEditForm';
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
+import { canEditRates } from '@/lib/permissions';
+import { redirect } from 'next/navigation';
 
 export default async function AdminRatesPage() {
+  const session = await getSession();
+  if (!canEditRates(session)) redirect('/dashboard');
+
   let products: Awaited<ReturnType<typeof prisma.product.findMany>> = [];
   let laborRates: Awaited<ReturnType<typeof prisma.laborRate.findMany>> = [];
   let marginProfiles: Awaited<ReturnType<typeof prisma.marginProfile.findMany>> = [];
@@ -21,7 +28,9 @@ export default async function AdminRatesPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Rate Tables</h1>
-      <p className="text-gray-500 text-sm">Editable assumptions that drive formula pricing. Phase 1: read-only view.</p>
+      <p className="text-gray-500 text-sm">Editable rate assumptions that drive formula pricing.</p>
+
+      <ProductEditForm />
 
       <Card title="Products">
         <table className="w-full text-sm">

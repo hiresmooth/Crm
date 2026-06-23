@@ -280,6 +280,21 @@ async function main() {
   });
 
   console.log('Seed complete:', { admin: admin.email, lead: lead.leadNumber });
+
+  const crmProviders = [
+    { provider: 'hubspot', name: 'HubSpot' },
+    { provider: 'ghl', name: 'GoHighLevel' },
+    { provider: 'zoho', name: 'Zoho CRM' },
+    { provider: 'airtable', name: 'Airtable / Make' },
+    { provider: 'smoothos', name: 'SmoothOS Native' },
+  ];
+  for (const c of crmProviders) {
+    await prisma.crmIntegration.upsert({
+      where: { provider: c.provider },
+      update: {},
+      create: { provider: c.provider, name: c.name, active: false },
+    });
+  }
 }
 
 main()
