@@ -688,3 +688,18 @@ model MarketingAdSpend {
   @@index([source, periodStart, periodEnd])
   @@map("marketing_ad_spend")
 }
+
+model CrmIntegration {
+  id         String   @id @default(uuid()) @db.Uuid
+  provider   String   @db.VarChar(50)
+  name       String   @db.VarChar(100)
+  webhookUrl String?  @map("webhook_url")
+  apiKey     String?  @map("api_key")
+  config     Json?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([provider])
+  @@map("crm_integrations")
+}
