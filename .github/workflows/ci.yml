@@ -33,7 +33,30 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npm test
+      - name: Set up database
+        run: npm run db:setup
+        env:
+          DATABASE_URL: postgresql://smoothos:smoothos@localhost:5432/smoothos?schema=public
       - run: npm run build
         env:
           DATABASE_URL: postgresql://smoothos:smoothos@localhost:5432/smoothos?schema=public
           AUTH_SECRET: ci-test-secret-minimum-32-characters-long
+          CRON_SECRET: ci-test-cron-secret
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+      - name: Start server and run E2E
+        run: |
+          npm run start:prod &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/api/health
+          npm run e2e
+          kill $SERVER_PID
+        env:
+          DATABASE_URL: postgresql://smoothos:smoothos@localhost:5432/smoothos?schema=public
+          AUTH_SECRET: ci-test-secret-minimum-32-characters-long
+          CRON_SECRET: ci-test-cron-secret
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          E2E_BASE_URL: http://localhost:3000
