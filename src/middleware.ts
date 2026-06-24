@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   '/proposals/view',
   '/api/auth/login',
   '/api/auth/logout',
+  '/api/health',
   '/api/v1/public',
   '/api/cron',
 ];
